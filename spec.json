@@ -1,0 +1,549 @@
+{
+  "project": {
+    "name": "supportai",
+    "version": "2.0",
+    "description": "LLM-powered AI customer support assistant with multi-stage ML pipeline: intent classification, semantic FAQ retrieval, sentiment analysis, context-aware LLM response generation, and algorithmic ticket creation with admin dashboard analytics."
+  },
+  "tech_stack": {
+    "framework": "FastAPI",
+    "frontend": "Streamlit",
+    "database": "SQLite",
+    "llm_provider": "opencode (deepseek v4 flash)",
+    "embedding_model": "all-MiniLM-L6-v2",
+    "classifier_model": "facebook/bart-large-mnli",
+    "sentiment_model": "cardiffnlp/twitter-roberta-base-sentiment-latest"
+  },
+  "features": [
+    {
+      "id": "FR-1",
+      "name": "Intent Classification",
+      "description": "Categorize user messages into billing, technical, account, or general. Two-mode architecture: LLM classification (primary) with keyword fallback (degraded mode).",
+      "acceptance_criteria": [
+        "'I was charged twice' classified as billing with confidence > 0.80",
+        "'I get error code 500' classified as technical with confidence > 0.80",
+        "'How do I change my email?' classified as account with confidence > 0.80",
+        "'What are your hours?' classified as general with confidence > 0.80",
+        "Confidence < 0.40 falls back to 'general'",
+        "Classification completes in < 500 ms (p95)",
+        "Gibberish/empty input returns general with low confidence"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-2",
+      "name": "LLM-Powered Context-Aware Responses",
+      "description": "Generate context-aware, natural responses using LLM that reference conversation history, detected intent, FAQ matches, and sentiment state. Template fallback ensures never fails to respond.",
+      "acceptance_criteria": [
+        "Turn 2 response references Turn 1 invoice number (INV-123)",
+        "Context holds last N messages (default 10, configurable)",
+        "LLM response generated via OpenAI/Gemini API",
+        "Response generated in < 3 seconds (p95)",
+        "LLM fallback to templates if API unavailable or timeout",
+        "Rate limiting prevents excessive API calls (60 req/min)",
+        "'New Conversation' button resets context"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-3",
+      "name": "FAQ Auto-Answer",
+      "description": "Semantic embedding-based FAQ matching using Sentence-Transformers with cosine similarity. Confidence thresholds determine auto-answer, suggestion with disclaimer, or pass-through to LLM generation.",
+      "acceptance_criteria": [
+        "Verbatim FAQ question returns answer in < 200 ms",
+        "Match confidence >= 0.90 returns FAQ verbatim",
+        "Match confidence 0.70-0.89 returns FAQ with disclaimer",
+        "Match confidence < 0.70 proceeds to LLM generation",
+        "FAQ database seeded with >= 20 entries across all 4 intents",
+        "FAQ UI allows add/edit/delete"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-4",
+      "name": "Response Quality Feedback",
+      "description": "Allow customers to rate their experience after the conversation for CSAT tracking.",
+      "acceptance_criteria": [
+        "Rating collected after conversation ends",
+        "Rating scale 1-5 stored in feedback table"
+      ],
+      "priority": "P2"
+    },
+    {
+      "id": "FR-5",
+      "name": "Sentiment-Triggered Escalation",
+      "description": "Detect frustration via sentiment analysis on every user message. Negative sentiment triggers escalation offer with state machine managing offer/decline/auto-escalation.",
+      "acceptance_criteria": [
+        "Sentiment analysis runs on every user message",
+        "Negative sentiment triggers escalation offer",
+        "User acceptance creates escalated ticket",
+        "User decline suppresses re-offer for 5 messages",
+        "Sentiment completes in < 500 ms (p95)"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-6",
+      "name": "Ticket Creation with Priority Scoring",
+      "description": "Auto-create tickets on escalation triggers with algorithmic priority scoring (1-5) based on sentiment, intent base, and urgent keyword matches.",
+      "acceptance_criteria": [
+        "Ticket created when user requests human",
+        "Ticket created on negative sentiment",
+        "Ticket created when FAQ confidence < 0.50",
+        "Priority score is integer 1-5",
+        "Status lifecycle: open -> in_progress -> resolved"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-7",
+      "name": "Dashboard Overview",
+      "description": "Admin dashboard with key metrics: 4 KPI cards (Total Tickets, Auto-Resolution Rate, Avg Handle Time, CSAT), ticket volume bar chart, resolution rate line chart, top keywords, and LLM usage metrics.",
+      "acceptance_criteria": [
+        "Dashboard loads in < 3 seconds",
+        "4 KPI cards with trend arrows vs prior 7 days",
+        "Ticket volume bar chart (7 days, stacked by intent)",
+        "Resolution rate line chart (7 days)",
+        "Top keywords chart (top 10)",
+        "Data auto-refreshes every 30 seconds"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-8",
+      "name": "Ticket Management",
+      "description": "Paginated, filterable, sortable ticket table with color-coded priority bars, status badges, and CSV export.",
+      "acceptance_criteria": [
+        "Table columns: ID, Intent, Priority (color-coded), Status (badge), Created, Actions",
+        "Filters: Status, Intent, Priority range, Escalated toggle",
+        "Sort: click any column header",
+        "Pagination: 50 per page",
+        "Click 'View' opens conversation transcript",
+        "Click 'Resolve' sets status to resolved",
+        "Export CSV of filtered view"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-9",
+      "name": "Conversation Detail",
+      "description": "Full conversation transcript view in chat-bubble format with metadata panel and resolve/reopen actions.",
+      "acceptance_criteria": [
+        "All messages shown in chronological chat-bubble format",
+        "Metadata panel: ticket details, priority breakdown",
+        "Resolve / Reopen ticket buttons",
+        "Export as JSON"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-10",
+      "name": "FAQ Management",
+      "description": "Admin CRUD interface for FAQ entries with search and intent-based filtering.",
+      "acceptance_criteria": [
+        "Add new FAQ entries via modal",
+        "Edit existing FAQ entries",
+        "Delete FAQ entries",
+        "Search and filter by intent"
+      ],
+      "priority": "P1"
+    },
+    {
+      "id": "FR-11",
+      "name": "Chat API",
+      "description": "POST /api/chat endpoint with session management for programmatic integration.",
+      "acceptance_criteria": [
+        "POST /api/chat returns 200 with reply within 3 seconds",
+        "Request without API key returns 401",
+        "Request with missing message returns 400",
+        "Request with existing session_id continues conversation"
+      ],
+      "priority": "P0"
+    },
+    {
+      "id": "FR-12",
+      "name": "Ticket API",
+      "description": "REST endpoints to fetch and update tickets with pagination, filtering, and sorting.",
+      "acceptance_criteria": [
+        "GET /api/tickets returns paginated ticket list",
+        "GET /api/tickets/{id} returns single ticket with conversation",
+        "PATCH /api/tickets/{id} updates ticket status"
+      ],
+      "priority": "P1"
+    },
+    {
+      "id": "FR-13",
+      "name": "FAQ API",
+      "description": "REST endpoints for FAQ CRUD operations with intent-based filtering.",
+      "acceptance_criteria": [
+        "GET /api/faq returns FAQ list with pagination",
+        "POST /api/faq creates new FAQ entry",
+        "DELETE /api/faq/{id} removes FAQ entry"
+      ],
+      "priority": "P2"
+    }
+  ],
+  "api_endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/chat",
+      "request_schema": {
+        "session_id": "string (optional, uuid)",
+        "message": "string (required, 1-2000 chars)",
+        "metadata": "object (optional, { source: string, page_url: string })"
+      },
+      "response_schema": {
+        "session_id": "string",
+        "reply": "string",
+        "intent": "string",
+        "intent_confidence": "number",
+        "faq_match": "object|null",
+        "sentiment": "object",
+        "ticket_created": "object|null",
+        "timing_ms": "number",
+        "response_method": "string (llm|template)"
+      },
+      "rate_limit": "60/min"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "request_schema": {
+        "status": "string (optional)",
+        "intent": "string (optional)",
+        "priority_min": "integer (optional)",
+        "priority_max": "integer (optional)",
+        "escalated": "boolean (optional)",
+        "page": "integer (optional, default 1)",
+        "per_page": "integer (optional, default 50)"
+      },
+      "response_schema": {
+        "tickets": "array",
+        "pagination": "{ page, per_page, total_items, total_pages }"
+      },
+      "rate_limit": "60/min"
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/{ticket_id}",
+      "request_schema": {},
+      "response_schema": {
+        "ticket_id": "string",
+        "session_id": "string",
+        "intent": "string",
+        "priority_score": "integer",
+        "priority_breakdown": "object",
+        "status": "string",
+        "escalated": "boolean",
+        "conversation": "array",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+        "resolved_at": "datetime|null"
+      },
+      "rate_limit": "60/min"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tickets/{ticket_id}",
+      "request_schema": {
+        "status": "string (open|in_progress|resolved)"
+      },
+      "response_schema": {
+        "ticket_id": "string",
+        "status": "string",
+        "updated_at": "datetime",
+        "resolved_at": "datetime|null"
+      },
+      "rate_limit": "60/min"
+    },
+    {
+      "method": "GET",
+      "path": "/api/faq",
+      "request_schema": {
+        "intent": "string (optional)",
+        "search": "string (optional)",
+        "page": "integer (optional, default 1)",
+        "per_page": "integer (optional, default 50)"
+      },
+      "response_schema": {
+        "faqs": "array",
+        "pagination": "{ page, per_page, total_items, total_pages }"
+      },
+      "rate_limit": "60/min"
+    },
+    {
+      "method": "POST",
+      "path": "/api/faq",
+      "request_schema": {
+        "question": "string (10-500 chars, unique)",
+        "answer": "string (20-2000 chars)",
+        "intent_tags": "array of strings"
+      },
+      "response_schema": {
+        "id": "integer",
+        "question": "string",
+        "answer": "string",
+        "intent_tags": "array",
+        "created_at": "datetime"
+      },
+      "rate_limit": "30/min"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/faq/{faq_id}",
+      "request_schema": {},
+      "response_schema": {
+        "status": "204 No Content"
+      },
+      "rate_limit": "30/min"
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/metrics",
+      "request_schema": {
+        "days": "integer (optional, default 7)"
+      },
+      "response_schema": {
+        "total_conversations": "integer",
+        "auto_resolved": "integer",
+        "escalated": "integer",
+        "resolution_rate": "number",
+        "avg_handling_time_seconds": "number",
+        "csat_score": "number",
+        "trends": "object",
+        "intent_breakdown": "object",
+        "daily_volume": "array",
+        "resolution_rate_over_time": "array",
+        "top_keywords": "array"
+      },
+      "rate_limit": "10/min"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "request_schema": {},
+      "response_schema": {
+        "status": "string (healthy|degraded|unhealthy)",
+        "version": "string",
+        "uptime_seconds": "number",
+        "models_loaded": "boolean",
+        "db_connected": "boolean",
+        "sessions_active": "integer",
+        "tickets_open": "integer",
+        "memory_usage_mb": "number"
+      },
+      "rate_limit": "120/min"
+    }
+  ],
+  "data_model": {
+    "tables": [
+      {
+        "name": "sessions",
+        "columns": [
+          {"name": "session_id", "type": "TEXT", "pk": true, "constraints": "PRIMARY KEY"},
+          {"name": "created_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"},
+          {"name": "last_active_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"},
+          {"name": "status", "type": "TEXT", "pk": false, "default": "active", "check": "IN ('active', 'expired')"},
+          {"name": "escalation_state", "type": "TEXT", "pk": false, "default": "normal", "check": "IN ('normal', 'escalation_offered', 'declined', 'escalated', 'auto_escalated')"},
+          {"name": "negative_message_count", "type": "INTEGER", "pk": false, "default": 0},
+          {"name": "active_ticket_id", "type": "TEXT", "pk": false, "nullable": true},
+          {"name": "metadata", "type": "TEXT", "pk": false, "nullable": true}
+        ],
+        "indexes": ["idx_sessions_last_active ON sessions(last_active_at)"]
+      },
+      {
+        "name": "messages",
+        "columns": [
+          {"name": "id", "type": "INTEGER", "pk": true, "constraints": "PRIMARY KEY AUTOINCREMENT"},
+          {"name": "session_id", "type": "TEXT", "pk": false, "nullable": false},
+          {"name": "role", "type": "TEXT", "pk": false, "check": "IN ('user', 'assistant', 'system')"},
+          {"name": "content", "type": "TEXT", "pk": false},
+          {"name": "intent", "type": "TEXT", "pk": false, "nullable": true, "check": "IN ('billing', 'technical', 'account', 'general', 'unknown')"},
+          {"name": "intent_confidence", "type": "REAL", "pk": false, "nullable": true},
+          {"name": "secondary_intent", "type": "TEXT", "pk": false, "nullable": true},
+          {"name": "method", "type": "TEXT", "pk": false, "nullable": true, "check": "IN ('llm', 'template_fallback', 'keyword_fallback')"},
+          {"name": "model", "type": "TEXT", "pk": false, "nullable": true},
+          {"name": "prompt_tokens", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "completion_tokens", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "sentiment", "type": "TEXT", "pk": false, "nullable": true, "check": "IN ('positive', 'neutral', 'negative')"},
+          {"name": "sentiment_score", "type": "REAL", "pk": false, "nullable": true},
+          {"name": "faq_matched", "type": "INTEGER", "pk": false, "default": 0},
+          {"name": "faq_id", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "faq_confidence", "type": "REAL", "pk": false, "nullable": true},
+          {"name": "auto_answered", "type": "INTEGER", "pk": false, "default": 0},
+          {"name": "timing_classification_ms", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "timing_faq_ms", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "timing_sentiment_ms", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "timing_generation_ms", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "timing_total_ms", "type": "INTEGER", "pk": false, "nullable": true},
+          {"name": "created_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"}
+        ],
+        "indexes": ["idx_messages_session ON messages(session_id)"]
+      },
+      {
+        "name": "tickets",
+        "columns": [
+          {"name": "ticket_id", "type": "TEXT", "pk": true, "constraints": "PRIMARY KEY"},
+          {"name": "session_id", "type": "TEXT", "pk": false},
+          {"name": "intent", "type": "TEXT", "pk": false},
+          {"name": "priority_score", "type": "INTEGER", "pk": false, "check": ">= 1 AND <= 5"},
+          {"name": "priority_breakdown", "type": "TEXT", "pk": false},
+          {"name": "status", "type": "TEXT", "pk": false, "default": "open", "check": "IN ('open', 'in_progress', 'resolved')"},
+          {"name": "escalated", "type": "INTEGER", "pk": false, "default": 0},
+          {"name": "auto_escalated", "type": "INTEGER", "pk": false, "default": 0},
+          {"name": "conversation_summary", "type": "TEXT", "pk": false, "nullable": true},
+          {"name": "created_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"},
+          {"name": "updated_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"},
+          {"name": "resolved_at", "type": "TIMESTAMP", "pk": false, "nullable": true}
+        ],
+        "indexes": ["idx_tickets_status ON tickets(status)", "idx_tickets_priority ON tickets(priority_score)"]
+      },
+      {
+        "name": "faq_entries",
+        "columns": [
+          {"name": "id", "type": "INTEGER", "pk": true, "constraints": "PRIMARY KEY AUTOINCREMENT"},
+          {"name": "question", "type": "TEXT", "pk": false, "constraints": "UNIQUE"},
+          {"name": "answer", "type": "TEXT", "pk": false},
+          {"name": "intent_tags", "type": "TEXT", "pk": false},
+          {"name": "embedding", "type": "BLOB", "pk": false, "nullable": true},
+          {"name": "match_count", "type": "INTEGER", "pk": false, "default": 0},
+          {"name": "created_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"},
+          {"name": "updated_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"}
+        ],
+        "indexes": []
+      },
+      {
+        "name": "feedback",
+        "columns": [
+          {"name": "id", "type": "INTEGER", "pk": true, "constraints": "PRIMARY KEY AUTOINCREMENT"},
+          {"name": "session_id", "type": "TEXT", "pk": false},
+          {"name": "rating", "type": "INTEGER", "pk": false, "check": ">= 1 AND <= 5"},
+          {"name": "comment", "type": "TEXT", "pk": false, "nullable": true},
+          {"name": "created_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"}
+        ],
+        "indexes": []
+      },
+      {
+        "name": "schema_version",
+        "columns": [
+          {"name": "version", "type": "INTEGER", "pk": true, "constraints": "PRIMARY KEY"},
+          {"name": "applied_at", "type": "TIMESTAMP", "pk": false, "default": "CURRENT_TIMESTAMP"},
+          {"name": "description", "type": "TEXT", "pk": false}
+        ],
+        "indexes": []
+      }
+    ]
+  },
+  "ui_screens": [
+    {
+      "name": "Chat Widget",
+      "description": "400x600px floating chat widget embedded in web pages. Blue header with robot icon and title. Chat bubble UI with bot/user bubbles, method badges (FAQ/LLM/Template), escalation prompt banner, and loading/typing animations.",
+      "components": ["header", "message_area", "input_field", "faq_badge", "llm_badge", "escalation_prompt", "loading_skeleton", "error_banner"]
+    },
+    {
+      "name": "Admin Dashboard - Overview",
+      "description": "4 KPI cards (Total Tickets, Auto-Resolution Rate, Avg Handle Time, CSAT) with trend arrows, 7-day volume bar chart (stacked by intent), 7-day resolution rate line chart, top 10 keywords chart, LLM usage metrics panel.",
+      "components": ["kpi_cards", "volume_bar_chart", "resolution_line_chart", "top_keywords_chart", "llm_usage_metrics"]
+    },
+    {
+      "name": "Admin Dashboard - Ticket List",
+      "description": "Paginated data table with color-coded priority bars, status badges, filters (status, intent, priority range, escalated toggle, search), column sorting, and CSV export button.",
+      "components": ["filter_bar", "data_table", "pagination", "csv_export_button"]
+    },
+    {
+      "name": "Admin Dashboard - Conversation Detail",
+      "description": "75/25 split layout. Left: chronological chat-bubble transcript. Right: metadata panel with status dropdown, priority breakdown, session info, timestamps, resolve/reopen buttons, and response method indicators.",
+      "components": ["transcript_panel", "metadata_panel", "status_dropdown", "resolve_button", "reopen_button", "export_json_button"]
+    },
+    {
+      "name": "Admin Dashboard - FAQ Management",
+      "description": "Search bar, intent filter dropdown, CRUD table with Add/Edit/Delete modals for managing FAQ entries.",
+      "components": ["search_bar", "intent_filter", "faq_table", "add_modal", "edit_modal", "delete_confirmation"]
+    }
+  ],
+  "config_vars": [
+    {"name": "OPENAI_API_KEY", "type": "string", "default": null, "description": "OpenAI API key"},
+    {"name": "GEMINI_API_KEY", "type": "string", "default": null, "description": "Google Gemini API key"},
+    {"name": "LLM_PROVIDER", "type": "string", "default": "openai", "description": "openai or gemini"},
+    {"name": "LLM_MODEL_CLASSIFY", "type": "string", "default": "gpt-4o-mini", "description": "Model for intent classification"},
+    {"name": "LLM_MODEL_SENTIMENT", "type": "string", "default": "gpt-4o-mini", "description": "Model for sentiment analysis"},
+    {"name": "LLM_MODEL_GENERATE", "type": "string", "default": "gpt-4o-mini", "description": "Model for response generation"},
+    {"name": "LLM_TEMPERATURE", "type": "float", "default": 0.3, "description": "Generation temperature"},
+    {"name": "LLM_TIMEOUT_SECONDS", "type": "int", "default": 5, "description": "API timeout in seconds"},
+    {"name": "LLM_MAX_RETRIES", "type": "int", "default": 2, "description": "Retry count on transient failure"},
+    {"name": "SUPPORTAI_API_KEYS", "type": "string", "default": "sk-supportai-test", "description": "Comma-separated valid API keys"},
+    {"name": "ADMIN_USERNAME", "type": "string", "default": "admin", "description": "Dashboard login username"},
+    {"name": "ADMIN_PASSWORD", "type": "string", "default": "admin", "description": "Dashboard login password"},
+    {"name": "DATABASE_URL", "type": "string", "default": "sqlite:///supportai.db", "description": "Database connection string"},
+    {"name": "FAQ_EMBEDDING_MODEL", "type": "string", "default": "all-MiniLM-L6-v2", "description": "Sentence transformer model for embeddings"},
+    {"name": "FAQ_AUTO_ANSWER_THRESHOLD", "type": "float", "default": 0.90, "description": "Auto-answer confidence threshold"},
+    {"name": "FAQ_SUGGEST_THRESHOLD", "type": "float", "default": 0.70, "description": "Suggestion confidence threshold"},
+    {"name": "SENTIMENT_FALLBACK_MODEL", "type": "string", "default": "cardiffnlp/twitter-roberta-base-sentiment-latest", "description": "HuggingFace sentiment fallback model"},
+    {"name": "SESSION_EXPIRY_MINUTES", "type": "int", "default": 30, "description": "Session TTL in minutes"},
+    {"name": "MAX_CONTEXT_MESSAGES", "type": "int", "default": 10, "description": "Messages in LLM context window"},
+    {"name": "RATE_LIMIT_DEFAULT", "type": "int", "default": 60, "description": "Requests per rate limit window"},
+    {"name": "RATE_LIMIT_WINDOW", "type": "int", "default": 60, "description": "Rate limit window in seconds"},
+    {"name": "CORS_ORIGINS", "type": "string", "default": "*", "description": "Allowed CORS origins"},
+    {"name": "LOG_LEVEL", "type": "string", "default": "INFO", "description": "Logging level"}
+  ],
+  "implementation_phases": [
+    {
+      "phase": 1,
+      "name": "Core Chat",
+      "description": "Days 1-2: Project scaffolding, config, database schema. Intent classification (LLM + keyword fallback). FAQ matching (embeddings + similarity). Sentiment analysis (LLM + HF fallback). Session manager (in-memory + SQLite). Chat pipeline orchestrator (10 steps). LLM response generator with template fallback. Template system (20 response templates).",
+      "tasks": [
+        "Project scaffolding and config setup",
+        "Database schema creation",
+        "Intent classification module (LLM + keyword fallback)",
+        "FAQ matching module (embeddings + similarity)",
+        "Sentiment analysis module (LLM + HF fallback)",
+        "Session manager (in-memory + SQLite)",
+        "Chat pipeline orchestrator (10 steps)",
+        "LLM response generator with template fallback",
+        "Template system (20 response templates)"
+      ]
+    },
+    {
+      "phase": 2,
+      "name": "Dashboard + Tickets",
+      "description": "Days 3-4: Ticket creation with priority scoring. Escalation state machine. Admin dashboard (Streamlit): overview + ticket list. FAQ management UI. Conversation detail view.",
+      "tasks": [
+        "Ticket creation with priority scoring algorithm",
+        "Escalation state machine",
+        "Admin dashboard overview (KPI cards, charts)",
+        "Ticket list view (paginated, filterable, sortable)",
+        "FAQ management CRUD UI",
+        "Conversation detail view (transcript + metadata)"
+      ]
+    },
+    {
+      "phase": 3,
+      "name": "API + Polish",
+      "description": "Days 5-6: REST API endpoints (chat, tickets, FAQ, admin, health). Authentication + rate limiting. Error handling + graceful degradation. Testing (unit, integration, pipeline). Prompt engineering refinement. CSV export + feedback collection.",
+      "tasks": [
+        "REST API endpoints (chat, tickets, FAQ, admin, health)",
+        "API key authentication",
+        "Rate limiting middleware",
+        "Error handling + graceful degradation matrix",
+        "Unit tests (80%+ coverage)",
+        "Integration tests",
+        "Pipeline tests",
+        "Prompt engineering refinement",
+        "CSV export for tickets",
+        "Feedback collection system"
+      ]
+    },
+    {
+      "phase": 4,
+      "name": "Deploy",
+      "description": "Day 7: GitHub repository setup. Streamlit Cloud / Railway / Render deployment. Environment variable configuration. FAQ seed data population. Final README documentation. Live demo URL verification.",
+      "tasks": [
+        "GitHub repository setup",
+        "Streamlit Cloud / Railway / Render deployment",
+        "Environment variable configuration",
+        "FAQ seed data population (22 entries)",
+        "Final README documentation",
+        "Live demo URL verification"
+      ]
+    }
+  ]
+}

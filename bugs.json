@@ -1,0 +1,164 @@
+{
+  "summary": {
+    "total_bugs": 17,
+    "critical": 2,
+    "error": 5,
+    "warning": 6,
+    "info": 4
+  },
+  "bugs": [
+    {
+      "id": 1,
+      "severity": "critical",
+      "category": "security",
+      "file": "supportai/middleware/auth.py",
+      "line": 28,
+      "description": "Hardcoded default API key 'sk-supportai-test' used when SUPPORTAI_API_KEYS env var is not set. Any client can authenticate with this well-known key in production.",
+      "suggestion": "Remove hardcoded default; require SUPPORTAI_API_KEYS to be explicitly set, or fail closed (empty list) if not configured."
+    },
+    {
+      "id": 2,
+      "severity": "critical",
+      "category": "security",
+      "file": "supportai/llm/llm_client.py",
+      "line": 76,
+      "description": "User message interpolated directly into LLM system prompt via f-string without sanitization. Attacker can inject commands via crafted messages in classify(), analyze_sentiment(), and generate_response().",
+      "suggestion": "Apply input sanitization boundary — add separator markers, strip known injection patterns (ignore, disregard, role-play), or use a secondary classifier to detect prompt injection before forwarding."
+    },
+    {
+      "id": 3,
+      "severity": "error",
+      "category": "performance",
+      "file": "supportai/db/database.py",
+      "line": 116,
+      "description": "All database methods use synchronous SQLAlchemy session (SessionLocal) inside async methods. Each DB call blocks the event loop — no asyncio.to_thread() or async SQLAlchemy engine used.",
+      "suggestion": "Replace SessionLocal with async SQLAlchemy (create_async_engine, AsyncSession) or wrap each DB call in asyncio.to_thread()."
+    },
+    {
+      "id": 4,
+      "severity": "error",
+      "category": "performance",
+      "file": "supportai/ml/classifier.py",
+      "line": 225,
+      "description": "Zero-shot classification model runs synchronously inside async pipeline. Blocking the event loop for multiple seconds per request will degrade throughput under load.",
+      "suggestion": "Offload model inference to a thread pool via asyncio.to_thread() or use an async-compatible inference server."
+    },
+    {
+      "id": 5,
+      "severity": "error",
+      "category": "performance",
+      "file": "supportai/ml/faq_matcher.py",
+      "line": 97,
+      "description": "SentenceTransformer .encode() runs synchronously inside async pipeline. Blocks event loop during embedding computation.",
+      "suggestion": "Wrap .encode() calls in asyncio.to_thread() or use a pre-computed embedding server."
+    },
+    {
+      "id": 6,
+      "severity": "error",
+      "category": "performance",
+      "file": "supportai/ml/sentiment.py",
+      "line": 81,
+      "description": "Transformer sentiment pipeline runs synchronously inside async pipeline. Blocks event loop.",
+      "suggestion": "Offload sentiment inference to asyncio.to_thread() or batch processing."
+    },
+    {
+      "id": 7,
+      "severity": "error",
+      "category": "logic",
+      "file": "supportai/services/session.py",
+      "line": 8,
+      "description": "SessionManager stores sessions in an in-memory dict with no expiry mechanism. Sessions never expire — session_expiry_minutes config in PipelineConfig is never consumed. Over time this leaks memory.",
+      "suggestion": "Add timestamp-based expiry check in get() and get_or_create(); evict sessions older than configured TTL."
+    },
+    {
+      "id": 8,
+      "severity": "warning",
+      "category": "logic",
+      "file": "supportai/ml/pipeline.py",
+      "line": 159,
+      "description": "No ticket deduplication check. Multiple messages at escalation_level >= 2 from the same session will create multiple tickets. Session.active_ticket_id exists in DB but is never populated.",
+      "suggestion": "Check session.active_ticket_id before creating a new ticket; skip creation if a ticket already exists for the session."
+    },
+    {
+      "id": 9,
+      "severity": "warning",
+      "category": "logic",
+      "file": "supportai/db/models.py",
+      "line": 35,
+      "description": "escalation_state column has check constraint with valid states but SessionManager and pipeline never update it. The state machine exists in schema but has no runtime implementation.",
+      "suggestion": "Implement escalation state transitions in the pipeline after _compute_escalation() — persist to session table."
+    },
+    {
+      "id": 10,
+      "severity": "warning",
+      "category": "logic",
+      "file": "supportai/widget/chat_widget.html",
+      "line": 271,
+      "description": "Chat widget POSTs to '/api/chat/init' and '/api/chat/message' — neither endpoint exists. The actual chat endpoint is POST /api/chat. Widget session init silently fails (catch block is empty).",
+      "suggestion": "Update widget to call POST /api/chat for messages and remove or implement the /api/chat/init endpoint."
+    },
+    {
+      "id": 11,
+      "severity": "warning",
+      "category": "logic",
+      "file": "supportai/llm/generator.py",
+      "line": 117,
+      "description": "Hardcoded length check (1000) in _validate_response ignores the max_chars parameter. If max_chars is configured differently (e.g., 2000), validation will reject valid LLM responses.",
+      "suggestion": "Use self._max_chars or pass max_chars to _validate_response instead of hardcoding 1000."
+    },
+    {
+      "id": 12,
+      "severity": "warning",
+      "category": "security",
+      "file": "supportai/middleware/auth.py",
+      "line": 13,
+      "description": "Swagger docs (/docs), ReDoc (/redoc), OpenAPI JSON, and root path (/) are exempt from authentication. Docs expose full API surface without auth.",
+      "suggestion": "Require auth for /docs and /redoc in production, or gate behind an admin-only condition."
+    },
+    {
+      "id": 13,
+      "severity": "warning",
+      "category": "performance",
+      "file": "supportai/routes/health.py",
+      "line": 55,
+      "description": "Reads SessionManager._sessions directly (private class-level attribute). This references the class attribute, not instance state. Fragile and bypasses any future session store refactoring.",
+      "suggestion": "Add a classmethod or property to SessionManager for session count — e.g., SessionManager.active_count()."
+    },
+    {
+      "id": 14,
+      "severity": "info",
+      "category": "data_integrity",
+      "file": "supportai/db/models.py",
+      "line": 122,
+      "description": "Message.faq_entry uses legacy backref pattern ('messages_using_faq') while all other relationships use modern back_populates. Inconsistent and may cause silent failures if session/bidirectional sync is used.",
+      "suggestion": "Replace backref='messages_using_faq' with back_populates paired field on FAQEntry."
+    },
+    {
+      "id": 15,
+      "severity": "info",
+      "category": "data_integrity",
+      "file": "supportai/db/models.py",
+      "line": 38,
+      "description": "Session.negative_message_count column has no CHECK constraint ensuring >= 0. If decremented below zero, no integrity error is raised.",
+      "suggestion": "Add CheckConstraint('negative_message_count >= 0', name='ck_negative_msg_count')."
+    },
+    {
+      "id": 16,
+      "severity": "info",
+      "category": "data_integrity",
+      "file": "supportai/db/models.py",
+      "line": 155,
+      "description": "No unique or partial-unique constraint on Ticket.session_id. Multiple tickets for the same session are allowed at schema level.",
+      "suggestion": "Consider a partial unique constraint on session_id where status != 'resolved', or enforce at application layer."
+    },
+    {
+      "id": 17,
+      "severity": "info",
+      "category": "logic",
+      "file": "supportai/app.py",
+      "line": 45,
+      "description": "Lifespan handler reads request_id_header from app.state as 'request_id', but no request_id has been set on app.state at that point — always returns None.",
+      "suggestion": "Remove this line or set a default such as app.state.request_id = 'startup' before referencing it."
+    }
+  ]
+}
